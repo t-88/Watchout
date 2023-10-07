@@ -21,6 +21,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"ffmpeg": "^0.0.4"
+		"ffmpeg": "^0.0.4",
+		"net": "^1.0.2"
 	}
 }

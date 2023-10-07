@@ -3,7 +3,7 @@
 
     <h1>Hello Watchers</h1>
 
-    <button on:click={load} >Say Hi To The Server</button>
+    <button on:click={send_load_request} >Say Hi To The Server</button>
     
     {#if did_say_hi_to_server} 
     <div>
@@ -26,7 +26,7 @@
 
     {#if did_say_hi_to_server && selected.row != -1 && selected.col != -1} 
         <br>
-        <button on:click={init_server}>Start Watching</button>    
+        <button on:click={send_start_request}>Start Watching</button>    
         <h1>:)</h1>
     {/if}
 </main>
@@ -38,81 +38,51 @@
 
 <script>
     import "./global.css";
+    import { onMount } from "svelte";
+    import SocketAPI from "../client_socket";
 
-    const server_addr = "http://" + "192.168.233.156" + ":6969";
-    let is_running = false; 
-
-    let did_say_hi_to_server = false;
 
     let rows = 0;
     let cols = 0;
-    let frame_rate = 60
-
-    let selected = {
-        row : -1,
-        col : -1,
-    };
+    let selected = {row : -1,col : -1,};
 
     let img_path;
 
-
-    async function load() {
-        console.log("loading data from server");
-
-        let res = await fetch(`${server_addr}/load`);
-        let data = await res.text();
-        data = JSON.parse(data);
-
-        rows = data.rows;
-        cols = data.cols;
-        frame_rate = data.frame_rate;
-
-        did_say_hi_to_server = true;
-    };
-
-    async function init_server() {
-        if(is_running) {
-            console.log("why are u running??");
-            return;
-        };
-        is_running = true;
-        update();
-    }
-
-    async function update() {
-        const res = await fetch(`${server_addr}/update${selected.row}${selected.col}`,{
-            method : "POST",
-            mode : "cors",
-            body : JSON.stringify(selected)
-        });
-        let data = await res.text();
-
-        if (data == "keep old") {
-            setTimeout(update,frame_rate);
-            return
-        }
+    let is_running = false; 
+    let did_say_hi_to_server = false;
 
 
+    // load data from server, rows , cols
+    function send_load_request() { SocketAPI.send("LOAD_DATA");}
+    function send_start_request(){ SocketAPI.send("START_STREAM",selected.col +  selected.row * rows);}
 
-        data = data.slice(2)
-        data = data.slice(0,data.length  - 1);
-
-
-
-        img_path = "data:image/png;charset=utf-8;base64,";
-        img_path += data;        
-
-        setTimeout(update,frame_rate);
-    }
 
 
     function select_window(x,y) {
         selected.row = y;
         selected.col = x;
-
         selected = {...selected};
     }
 
+    // load data callback
+    function load_data_callback(data) {
+        rows = data.rows;
+        cols = data.cols;
+        
+        did_say_hi_to_server = true;
+    };
+
+    // every frame callback
+    function update_callback(data) {
+        img_path = data;
+        is_running = true;
+    }
+
+    onMount(() => {
+        SocketAPI.callback("LOAD_DATA_JSON",load_data_callback)
+        SocketAPI.callback("STREAM_STARTED",update_callback)
+        SocketAPI.init();
+    });
 
 </script>
 
